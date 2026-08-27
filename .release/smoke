@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+require __DIR__.'/vendor/autoload.php';
+
+use Egensolve\Realtime\Contracts\Artifacts\ArtifactsClient;
+use Egensolve\Realtime\Contracts\Http\Transport;
+use Egensolve\Realtime\Contracts\Http\TransportResponse;
+use Egensolve\Realtime\Contracts\Media\MediaClient;
+
+$publisher = new Egensolve\Realtime\Contracts\Publish\PublicationClient(
+    'https://ers.example',
+    'synthetic-key',
+    str_repeat('x', 32),
+    new Egensolve\Realtime\Contracts\Publish\CurlTransport(),
+);
+
+$transport = new class implements Transport {
+    public array $requests = [];
+
+    public function send(string $method, string $url, array $headers, ?string $body, int $timeoutSeconds, int $maxResponseBytes): TransportResponse
+    {
+        $this->requests[] = [$url, $body];
+
+        return new TransportResponse(200, [], '{"state":"ready"}');
+    }
+};
+$id = '01k3k7qh0f8w2y7x4m6n9p1r3t';
+$media = new MediaClient('https://ers.example', str_repeat('x', 32), $transport);
+$artifacts = new ArtifactsClient('https://ers.example', str_repeat('x', 32), $transport);
+if ($media->asset($id)->data['state'] !== 'ready') {
+    throw new RuntimeException('Media consumer failed.');
+}
+$artifacts->publishRevision($id, $id, 'publish');
+if (parse_url($transport->requests[0][0], PHP_URL_PATH) !== '/api/v1/media/assets/'.$id
+    || json_decode($transport->requests[1][1], true)['revision_id'] !== $id) {
+    throw new RuntimeException('Consumer IDs were not preserved.');
+}
