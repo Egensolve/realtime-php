@@ -24,6 +24,11 @@ final readonly class MediaClient
         return $this->http->request('POST', '/api/v1/media/assets/upload-intents', $this->versioned($intent), $idempotencyKey);
     }
 
+    public function policy(): ApiResponse
+    {
+        return $this->http->request('GET', '/api/v1/media/policy');
+    }
+
     public function asset(string $assetId): ApiResponse
     {
         return $this->http->request('GET', '/api/v1/media/assets/'.$this->id($assetId));
@@ -46,9 +51,36 @@ final readonly class MediaClient
     }
 
      
+    public function renewUploadCapability(string $assetId, array $renewal, string $idempotencyKey): ApiResponse
+    {
+        foreach (['upload_id', 'upload_token'] as $field) {
+            if (! \is_string($renewal[$field] ?? null)
+                || \preg_match('/^[!-~]{1,160}$/D', $renewal[$field]) !== 1) {
+                throw new \InvalidArgumentException('Media renewal '.$field.' is invalid.');
+            }
+        }
+        if (\array_key_exists('part_number', $renewal)
+            && (! \is_int($renewal['part_number']) || $renewal['part_number'] < 1 || $renewal['part_number'] > 10_000)) {
+            throw new \InvalidArgumentException('Media renewal part number is invalid.');
+        }
+
+        return $this->http->request(
+            'POST',
+            '/api/v1/media/assets/'.$this->id($assetId).'/upload-capabilities',
+            $this->versioned($renewal),
+            $idempotencyKey,
+        );
+    }
+
+     
     public function createDownloadGrant(string $assetId, array $grant, string $idempotencyKey): ApiResponse
     {
         return $this->http->request('POST', '/api/v1/media/assets/'.$this->id($assetId).'/download-grants', $this->versioned($grant), $idempotencyKey);
+    }
+
+    public function updateRetention(string $assetId, ?string $expiresAt, string $idempotencyKey): ApiResponse
+    {
+        return $this->http->request('PATCH', '/api/v1/media/assets/'.$this->id($assetId).'/retention', ['version' => 1, 'expires_at' => $expiresAt], $idempotencyKey);
     }
 
     public function deleteAsset(string $assetId, string $idempotencyKey): ApiResponse

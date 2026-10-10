@@ -10,6 +10,7 @@ namespace Egensolve\Realtime\Contracts\Channel;
 
 
 
+
 interface Channel
 {
     public function tenant(): string;

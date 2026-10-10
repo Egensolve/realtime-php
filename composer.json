@@ -1,6 +1,6 @@
 {
   "name": "egensolve/realtime",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "ERS protocol, publication and trusted-backend Media and Artifacts clients.",
   "type": "library",
   "license": "MIT",

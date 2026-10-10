@@ -5,9 +5,14 @@ declare(strict_types=1);
 require __DIR__.'/vendor/autoload.php';
 
 use Egensolve\Realtime\Contracts\Artifacts\ArtifactsClient;
+use Egensolve\Realtime\Contracts\Auth\ChannelAuthSigner;
+use Egensolve\Realtime\Contracts\Auth\SocketId;
+use Egensolve\Realtime\Contracts\Channel\CallChannel;
+use Egensolve\Realtime\Contracts\Channel\ChannelParser;
 use Egensolve\Realtime\Contracts\Http\Transport;
 use Egensolve\Realtime\Contracts\Http\TransportResponse;
 use Egensolve\Realtime\Contracts\Media\MediaClient;
+use Egensolve\Realtime\Contracts\ValidationError;
 
 $publisher = new Egensolve\Realtime\Contracts\Publish\PublicationClient(
     'https://ers.example',
@@ -16,7 +21,7 @@ $publisher = new Egensolve\Realtime\Contracts\Publish\PublicationClient(
     new Egensolve\Realtime\Contracts\Publish\CurlTransport(),
 );
 
-$transport = new class implements Transport {
+$transport = new class () implements Transport {
     public array $requests = [];
 
     public function send(string $method, string $url, array $headers, ?string $body, int $timeoutSeconds, int $maxResponseBytes): TransportResponse
@@ -32,8 +37,10 @@ $artifacts = new ArtifactsClient('https://ers.example', str_repeat('x', 32), $tr
 if ($media->asset($id)->data['state'] !== 'ready') {
     throw new RuntimeException('Media consumer failed.');
 }
+$media->renewUploadCapability($id, ['upload_id' => 'upl_opaque', 'upload_token' => 'upl_tok_opaque'], 'renew');
 $artifacts->publishRevision($id, $id, 'publish');
 if (parse_url($transport->requests[0][0], PHP_URL_PATH) !== '/api/v1/media/assets/'.$id
-    || json_decode($transport->requests[1][1], true)['revision_id'] !== $id) {
+    || parse_url($transport->requests[1][0], PHP_URL_PATH) !== '/api/v1/media/assets/'.$id.'/upload-capabilities'
+    || json_decode($transport->requests[2][1], true)['revision_id'] !== $id) {
     throw new RuntimeException('Consumer IDs were not preserved.');
 }

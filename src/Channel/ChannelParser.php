@@ -35,11 +35,14 @@ final class ChannelParser
         if ($count === 5 && $parts[0] === 'private-v1' && $parts[1] === 'tenants' && $parts[3] === 'systems') {
             return SystemChannel::for(tenant: $parts[2], scope: $parts[4]);
         }
+        if ($count === 5 && $parts[0] === 'private-v2' && $parts[1] === 'tenants' && $parts[3] === 'calls') {
+            return CallChannel::for(tenant: $parts[2], callId: $parts[4]);
+        }
 
         throw ValidationError::make(
             ValidationErrorCode::ChannelInvalidFormat,
             ValidationErrorCategory::Grammar,
-            'Channel name does not match any of the four supported v1 shapes.',
+            'Channel name does not match a supported versioned shape.',
         );
     }
 }

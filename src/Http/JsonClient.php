@@ -25,7 +25,7 @@ final readonly class JsonClient
     public function request(string $method, string $path, ?array $payload = null, ?string $idempotencyKey = null): ApiResponse
     {
         $method = \strtoupper($method);
-        if (! \in_array($method, ['GET', 'POST', 'PUT', 'DELETE'], true)
+        if (! \in_array($method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], true)
             || ! \preg_match('#^/api/v1/(?:media|artifacts)/[A-Za-z0-9._~!$&\'()*+,;=:@%/-]*$#D', $path)) {
             throw new \InvalidArgumentException('ERS HTTP method or path is invalid.');
         }
