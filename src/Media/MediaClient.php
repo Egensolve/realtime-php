@@ -78,6 +78,16 @@ final readonly class MediaClient
         return $this->http->request('POST', '/api/v1/media/assets/'.$this->id($assetId).'/download-grants', $this->versioned($grant), $idempotencyKey);
     }
 
+    public function renewRetention(string $assetId, string $requestedExpiresAt, string $idempotencyKey, ?string $expectedExpiresAt = null): ApiResponse
+    {
+        $body = ['version' => 1, 'requested_expires_at' => $requestedExpiresAt];
+        if ($expectedExpiresAt !== null) {
+            $body['expected_expires_at'] = $expectedExpiresAt;
+        }
+
+        return $this->http->request('POST', '/api/v1/media/assets/'.$this->id($assetId).'/retention', $body, $idempotencyKey);
+    }
+
     public function updateRetention(string $assetId, ?string $expiresAt, string $idempotencyKey): ApiResponse
     {
         return $this->http->request('PATCH', '/api/v1/media/assets/'.$this->id($assetId).'/retention', ['version' => 1, 'expires_at' => $expiresAt], $idempotencyKey);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3-alpha.1
+
+- Add trusted-backend Intelligence profile discovery, asynchronous jobs, cancellation and immutable instruction revisions.
+- Keep instructions, context, material and generated text in private Media.
+- Preserve the existing protocol, publication, Media and Artifacts APIs without adding runtime dependencies.
+
 ## 0.2.2
 
 - Discover effective Media retention and permitted tiering profiles.

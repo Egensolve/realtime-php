@@ -26,7 +26,7 @@ final readonly class JsonClient
     {
         $method = \strtoupper($method);
         if (! \in_array($method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], true)
-            || ! \preg_match('#^/api/v1/(?:media|artifacts)/[A-Za-z0-9._~!$&\'()*+,;=:@%/-]*$#D', $path)) {
+            || ! \preg_match('#^/api/v1/(?:media|artifacts|intelligence)/[A-Za-z0-9._~!$&\'()*+,;=:@%/-]*$#D', $path)) {
             throw new \InvalidArgumentException('ERS HTTP method or path is invalid.');
         }
         $headers = ['Accept' => 'application/json', 'Authorization' => 'Bearer '.$this->machineCredential];

@@ -71,3 +71,30 @@ MIT. See [LICENSE](LICENSE).
 ## Media retention and tiering
 
 Trusted product backends can use `MediaClient.policy()` to discover effective retention limits and permitted tiering profile IDs. `updateRetention` accepts an explicit ISO-8601 expiry or authorized null expiry and an idempotency key. Upload intents may select a permitted `tiering_profile`. These endpoints require a server supporting configurable retention and the appropriate machine-credential abilities; null expiry does not extend upload or download capabilities.
+
+## Intelligence text generation candidate
+
+Trusted product backends may use `Intelligence\IntelligenceClient` with a separate Intelligence
+machine credential to list enabled profiles, create/read/cancel jobs, and create/read immutable
+instruction-set revisions. `text-generation-v1` accepts private Media asset references, not inline
+prompts. Upload versioned instruction/context/material documents through Media with declared SHA-256
+digests; wait for readiness before creating the job. Inputs and outputs must share the authenticated
+installation/resource scope. Use stable idempotency keys for mutations. Poll until ready, then
+obtain a Media download grant with the separate same-scope Media credential. Treat generated text
+as untrusted; business authorization and every decision to apply or send remain product-owned.
+
+The client does not poll, send product messages, choose models, or retry inference. It adds no runtime
+dependency and does not alter `PublicationClient`. This is an unreleased candidate, not a deployment
+or publication authorization.
+
+The candidate version is `0.2.3-alpha.1`. It is distinct from `0.2.2` and retains the existing
+public APIs. After a reviewed registry publication, pin the exact prerelease in the application
+lockfile; this document does not imply that the prerelease is available in a registry.
+
+Create reusable instructions in two steps: `createInstructionSet([], $setKey)` accepts no revision
+fields; `addInstructionRevision($setId, $revision, $revisionKey)` accepts `profile`,
+`instruction_asset_id` and `material_asset_ids` (including an empty list). Use its returned
+`instruction_revision_id` for subsequent jobs. A one-off job uses `instruction_asset_id` instead.
+Read the result reference from `$job['output']['asset_id']` after a ready poll, then obtain a Media
+download grant. Bound polling, handle failed/cancelled/expired states, and inspect `finish_reason`
+in the downloaded document: `length` and `content_filtered` are incomplete candidates.

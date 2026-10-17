@@ -44,3 +44,104 @@ if (parse_url($transport->requests[0][0], PHP_URL_PATH) !== '/api/v1/media/asset
     || json_decode($transport->requests[2][1], true)['revision_id'] !== $id) {
     throw new RuntimeException('Consumer IDs were not preserved.');
 }
+
+
+$call = CallChannel::for('example', 'call_Demo');
+$channelName = 'private-v2.tenants.example.calls.call_Demo';
+$parsed = ChannelParser::parse($channelName);
+if (! $parsed instanceof CallChannel || $parsed->callId !== 'call_Demo'
+    || $parsed->tenant() !== 'example' || $call->toString() !== $channelName
+    || $parsed->toString() !== $channelName) {
+    throw new RuntimeException('Standalone Calls channel round trip failed.');
+}
+$secret = str_repeat('x', 32);
+$authorization = (new ChannelAuthSigner('synthetic-key', $secret))->sign(SocketId::fromString('123.456'), $parsed);
+if ($authorization->auth !== 'synthetic-key:'.hash_hmac('sha256', '123.456:'.$channelName, $secret)
+    || $authorization->channelData !== null) {
+    throw new RuntimeException('Standalone Calls authorization failed.');
+}
+$longId = str_repeat('c', 128);
+$atLimit = CallChannel::for(str_repeat('t', 10), $longId)->toString();
+if (strlen($atLimit) !== 164 || ChannelParser::parse($atLimit)->toString() !== $atLimit) {
+    throw new RuntimeException('Standalone Calls boundary round trip failed.');
+}
+foreach ([
+    'private-v1.tenants.example.calls.call_demo',
+    'presence-v1.tenants.example.calls.call_demo',
+    'private-v2.tenants.example.accounts.user.demo',
+    'private-v2.tenants.example.calls.',
+    'private-v2.tenants.example.calls.call/demo',
+    'private-v2.tenants.t.calls.'.str_repeat('c', 129),
+    'private-v2.tenants.'.str_repeat('t', 11).'.calls.'.$longId,
+] as $invalid) {
+    try {
+        ChannelParser::parse($invalid);
+    } catch (ValidationError) {
+        continue;
+    }
+    throw new RuntimeException('Standalone Calls parser accepted an invalid channel.');
+}
+
+// This transport models the public response shapes without contacting a service or running inference.
+$intelligenceTransport = new class () implements Transport {
+    public array $requests = [];
+
+    public function send(string $method, string $url, array $headers, ?string $body, int $timeoutSeconds, int $maxResponseBytes): TransportResponse
+    {
+        $this->requests[] = [$method, parse_url($url, PHP_URL_PATH), $headers, $body === null ? null : json_decode($body, true, flags: JSON_THROW_ON_ERROR)];
+        $id = '01k3k7qh0f8w2y7x4m6n9p1r3t';
+        $data = match (count($this->requests)) {
+            1 => ['profiles' => [['profile' => 'text-generation-v1']]],
+            2 => ['instruction_set_id' => $id, 'revisions' => []],
+            3 => ['instruction_revision_id' => $id, 'revision' => 1],
+            4 => ['instruction_set_id' => $id, 'revisions' => [['instruction_revision_id' => $id]]],
+            5, 6 => ['job_id' => $id, 'state' => 'processing', 'output' => null],
+            7 => ['job_id' => $id, 'state' => 'ready', 'output' => ['asset_id' => $id, 'media_type' => 'application/vnd.egensolve.generated-text+json']],
+            8 => ['job_id' => $id, 'state' => 'cancelling', 'output' => null],
+            default => throw new RuntimeException('Unexpected Intelligence request.'),
+        };
+
+        return new TransportResponse(200, [], json_encode(['version' => 1, ...$data], JSON_THROW_ON_ERROR));
+    }
+};
+$intelligence = new Egensolve\Realtime\Contracts\Intelligence\IntelligenceClient('https://ers.example', str_repeat('i', 32), $intelligenceTransport);
+if ($intelligence->profiles()->data['profiles'][0]['profile'] !== 'text-generation-v1') {
+    throw new RuntimeException('Intelligence profile discovery failed.');
+}
+$set = $intelligence->createInstructionSet([], 'instructions')->data;
+$revision = $intelligence->addInstructionRevision($set['instruction_set_id'], [
+    'profile' => 'text-generation-v1', 'instruction_asset_id' => $id, 'material_asset_ids' => [],
+], 'revision')->data;
+$intelligence->instructionSet($set['instruction_set_id']);
+$request = ['profile' => 'text-generation-v1', 'instruction_revision_id' => $revision['instruction_revision_id'],
+    'inputs' => [['role' => 'context', 'asset_id' => $id]], 'output_expires_at' => '2026-11-01T00:00:00Z'];
+$job = $intelligence->createJob($request, 'generate')->data;
+// An equal retry preserves every request byte and its idempotency key.
+$intelligence->createJob($request, 'generate');
+$ready = $intelligence->job($job['job_id'])->data;
+if ($ready['state'] !== 'ready' || $ready['output']['asset_id'] !== $id) {
+    throw new RuntimeException('Intelligence output discovery failed.');
+}
+$media->createDownloadGrant($ready['output']['asset_id'], ['expires_in_seconds' => 60], 'output-grant');
+$intelligence->cancelJob($job['job_id'], 'cancel');
+$requests = $intelligenceTransport->requests;
+$paths = ['/profiles', '/instruction-sets', '/instruction-sets/'.$id.'/revisions', '/instruction-sets/'.$id,
+    '/jobs', '/jobs', '/jobs/'.$id, '/jobs/'.$id.'/cancel'];
+foreach ($requests as $index => [$method, $path, $headers, $body]) {
+    if ($path !== '/api/v1/intelligence'.$paths[$index]
+        || $headers['Authorization'] !== 'Bearer '.str_repeat('i', 32)
+        || $method !== (in_array($index, [0, 3, 6], true) ? 'GET' : 'POST')
+        || ($body !== null && $body['version'] !== 1)) {
+        throw new RuntimeException('Intelligence transport contract failed.');
+    }
+}
+if ($requests[1][3] !== ['version' => 1]
+    || $requests[4] !== $requests[5]
+    || $requests[4][2]['Idempotency-Key'] !== 'generate'
+    || $requests[7][3] !== ['version' => 1]) {
+    throw new RuntimeException('Intelligence mutation or replay contract failed.');
+}
+$grant = $transport->requests[array_key_last($transport->requests)];
+if (!str_ends_with($grant[0], '/api/v1/media/assets/'.$id.'/download-grants')) {
+    throw new RuntimeException('Intelligence Media output grant failed.');
+}

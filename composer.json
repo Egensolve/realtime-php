@@ -1,14 +1,14 @@
 {
   "name": "egensolve/realtime",
-  "version": "0.2.2",
-  "description": "ERS protocol, publication and trusted-backend Media and Artifacts clients.",
+  "version": "0.2.3-alpha.1",
+  "description": "ERS protocol, publication and trusted-backend Media, Artifacts and Intelligence clients.",
   "type": "library",
   "license": "MIT",
   "require": {
     "php": "^8.4"
   },
   "suggest": {
-    "ext-curl": "Required by the default publication and Media/Artifacts HTTP transports; optional with an injected transport."
+    "ext-curl": "Required by the default HTTP transports; optional with an injected transport."
   },
   "autoload": {
     "psr-4": {
